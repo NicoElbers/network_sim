@@ -1,8 +1,9 @@
 [package]
-name = "network-sim"
+name = "network_sim"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.82"
