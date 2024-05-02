@@ -9,7 +9,6 @@ use std::time::Instant;
 use network_sim::{corruption_type::Corruption, hardware::Node, rand::XorShift};
 
 const ASCII_TEST_MSG: &[u8] = "Hello world!".as_bytes();
-const BIN_TEST_MSG: [u8; 5] = [0x69, 0x7, 0x9, 0x2, 0x42];
 
 #[test]
 fn send_data_clean() -> anyhow::Result<()> {
