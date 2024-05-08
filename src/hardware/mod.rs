@@ -1,29 +1,41 @@
-use std::{fmt::Debug, rc::Rc};
+use std::{
+    fmt::Debug,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
+};
 
 use crate::{
-    physical_layer::cable::Cable,
+    bit::Bit,
+    bit_string::BitString,
+    physical_layer::cable::{Cable, CableContext},
     utils::mac_address::{MacAddress, MacAddressGenerator},
 };
 
 pub trait Node: Debug {
     fn get_mac(&self) -> &MacAddress;
 
-    fn add_connection(&mut self, cable: Rc<Cable>);
+    fn get_transmitter(&self) -> Arc<Sender<CableContext>>;
 
-    fn get_connections(&self) -> &Vec<Rc<Cable>>;
+    fn add_connection(&mut self, cable: Arc<Cable>);
 
-    fn receive_byte(&self, byte: u8);
+    fn get_connections(&self) -> &Vec<Arc<Cable>>;
 
-    fn send_byte_mac(
-        src: &MacAddress,
-        dest: &MacAddress,
+    fn receive_bit(&self, bit: Bit);
+
+    fn send_bit_mac(
+        source_mac: MacAddress,
+        source_port: u16,
+        target_port: u16,
         cable: &mut Cable,
-        data: Vec<u8>,
+        data: BitString,
     ) -> anyhow::Result<()>
     where
         Self: Sized,
     {
-        cable.send_data(src, dest, data)
+        // cable.send_bits(src, dest, data)
+        cable.send_bits(source_mac, source_port, target_port, data)
     }
 }
 
@@ -38,19 +50,21 @@ impl Eq for dyn Node {}
 #[derive(Debug)]
 pub struct Router {
     mac: MacAddress,
-    connections: Vec<Rc<Cable>>,
+    connections: Vec<Arc<Cable>>,
+    receiver: Receiver<CableContext>,
+    transmitter: Arc<Sender<CableContext>>,
     is_edge_router: bool,
 }
 
 impl Node for Router {
-    fn add_connection(&mut self, cable: Rc<Cable>) {
+    fn add_connection(&mut self, cable: Arc<Cable>) {
         if self.connections.contains(&cable) {
             return;
         }
         self.connections.push(cable.clone());
     }
 
-    fn get_connections(&self) -> &Vec<Rc<Cable>> {
+    fn get_connections(&self) -> &Vec<Arc<Cable>> {
         &self.connections
     }
 
@@ -58,8 +72,12 @@ impl Node for Router {
         &self.mac
     }
 
+    fn get_transmitter(&self) -> Arc<Sender<CableContext>> {
+        self.transmitter.clone()
+    }
+
     #[allow(dead_code)]
-    fn receive_byte(&self, _byte: u8) {
+    fn receive_bit(&self, _bit: Bit) {
         todo!()
     }
 }
@@ -68,8 +86,13 @@ impl Router {
     pub fn new(is_edge_router: bool, mac_address_gen: &mut MacAddressGenerator) -> Self {
         let mac = mac_address_gen.gen_addr();
 
+        let (tx, rx) = channel::<CableContext>();
+        let transmitter = tx.into();
+
         Self {
             mac,
+            transmitter,
+            receiver: rx,
             connections: Vec::new(),
             is_edge_router,
         }
@@ -80,32 +103,45 @@ impl Router {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct User {
     mac: MacAddress,
-    connections: Vec<Rc<Cable>>,
+    connections: Vec<Arc<Cable>>,
+    receiver: Receiver<CableContext>,
+    transmitter: Arc<Sender<CableContext>>,
+}
+
+impl PartialEq for User {
+    fn eq(&self, other: &Self) -> bool {
+        self.mac == other.mac && self.connections == other.connections
+    }
 }
 
 impl User {
     pub fn new(mac_address_gen: &mut MacAddressGenerator) -> Self {
         let mac = mac_address_gen.gen_addr();
 
+        let (tx, rx) = channel::<CableContext>();
+        let transmitter = tx.into();
+
         Self {
             mac,
             connections: Vec::new(),
+            transmitter,
+            receiver: rx,
         }
     }
 }
 
 impl Node for User {
-    fn add_connection(&mut self, cable: Rc<Cable>) {
+    fn add_connection(&mut self, cable: Arc<Cable>) {
         if self.connections.contains(&cable) {
             return;
         }
         self.connections.push(cable.clone());
     }
 
-    fn get_connections(&self) -> &Vec<Rc<Cable>> {
+    fn get_connections(&self) -> &Vec<Arc<Cable>> {
         &self.connections
     }
 
@@ -113,8 +149,12 @@ impl Node for User {
         &self.mac
     }
 
+    fn get_transmitter(&self) -> Arc<Sender<CableContext>> {
+        self.transmitter.clone()
+    }
+
     #[allow(dead_code)]
-    fn receive_byte(&self, _byte: u8) {
+    fn receive_bit(&self, _bit: Bit) {
         todo!()
     }
 }

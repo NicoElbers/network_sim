@@ -1,9 +1,10 @@
-use std::{
-    rc::Rc,
-    sync::mpsc::{channel, Receiver, Sender},
+use std::sync::{
+    mpsc::{channel, Receiver, Sender},
+    Arc,
 };
 
 use network_sim::{
+    bit::Bit,
     hardware::Node,
     mac_address::{MacAddress, MacAddressGenerator},
     physical_layer::cable::Cable,
@@ -12,15 +13,15 @@ use network_sim::{
 #[derive(Debug)]
 pub(crate) struct TestUser {
     mac: MacAddress,
-    connections: Vec<Rc<Cable>>,
-    byte_sender: Sender<u8>,
+    connections: Vec<Arc<Cable>>,
+    byte_sender: Sender<Bit>,
 }
 
 impl TestUser {
-    pub fn new(mac_address_gen: &mut MacAddressGenerator) -> (Self, Receiver<u8>) {
+    pub fn new(mac_address_gen: &mut MacAddressGenerator) -> (Self, Receiver<Bit>) {
         let mac = mac_address_gen.gen_addr();
 
-        let (tx, rx) = channel::<u8>();
+        let (tx, rx) = channel::<Bit>();
 
         let usr = Self {
             mac,
@@ -33,14 +34,18 @@ impl TestUser {
 }
 
 impl Node for TestUser {
-    fn add_connection(&mut self, cable: Rc<Cable>) {
+    fn add_connection(&mut self, cable: Arc<Cable>) {
         if self.connections.contains(&cable) {
             return;
         }
         self.connections.push(cable.clone());
     }
 
-    fn get_connections(&self) -> &Vec<Rc<Cable>> {
+    fn get_transmitter(&self) -> Arc<Sender<network_sim::physical_layer::cable::CableContext>> {
+        unimplemented!()
+    }
+
+    fn get_connections(&self) -> &Vec<Arc<Cable>> {
         &self.connections
     }
 
@@ -48,7 +53,7 @@ impl Node for TestUser {
         &self.mac
     }
 
-    fn receive_byte(&self, byte: u8) {
-        self.byte_sender.send(byte).unwrap()
+    fn receive_bit(&self, bit: Bit) {
+        self.byte_sender.send(bit).unwrap()
     }
 }

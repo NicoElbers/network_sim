@@ -1,6 +1,7 @@
 use core::slice;
 use std::{
-    ops::{Shl, ShlAssign, Shr, ShrAssign},
+    iter::once,
+    ops::{Index, IndexMut, Shl, ShlAssign, Shr, ShrAssign},
     vec::IntoIter,
 };
 
@@ -8,7 +9,10 @@ use anyhow::ensure;
 
 use crate::{
     bit::Bit,
-    macros::{append_type, bit_string_from, get_type, set_type},
+    macros::{
+        append_type, bit_string_as_vec, bit_string_from_val, bit_string_from_vec, get_type,
+        insert_type, set_type,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +53,12 @@ impl BitString {
     append_type!(u64);
     append_type!(u128);
 
+    insert_type!(u8);
+    insert_type!(u16);
+    insert_type!(u32);
+    insert_type!(u64);
+    insert_type!(u128);
+
     get_type!(u8);
     get_type!(u16);
     get_type!(u32);
@@ -65,6 +75,20 @@ impl BitString {
         assert!(index < self.bit_vec.len());
 
         *self.get_bit_mut(index) = bit;
+    }
+
+    bit_string_as_vec!(u8);
+    bit_string_as_vec!(u16);
+    bit_string_as_vec!(u32);
+    bit_string_as_vec!(u64);
+    bit_string_as_vec!(u128);
+
+    pub fn is_empty(&self) -> bool {
+        self.bit_vec.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.bit_vec.len()
     }
 
     pub fn flip_bits(&mut self, index: usize, length: usize) {
@@ -114,6 +138,17 @@ impl BitString {
         self.bit_vec.resize(new_len, Bit::On);
     }
 
+    pub fn insert_bit(&mut self, index: usize, bit: Bit) {
+        assert!(index < self.bit_vec.len());
+        self.bit_vec.reserve(1);
+
+        self.bit_vec.splice(index..index, once(bit));
+    }
+
+    pub fn prepend_bit(&mut self, bit: Bit) {
+        self.insert_bit(0, bit)
+    }
+
     pub fn as_bit_slice(&self) -> &[Bit] {
         &self.bit_vec
     }
@@ -150,6 +185,20 @@ impl BitString {
         }
 
         string
+    }
+}
+
+impl Index<usize> for BitString {
+    type Output = Bit;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.bit_vec[index]
+    }
+}
+
+impl IndexMut<usize> for BitString {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.bit_vec[index]
     }
 }
 
@@ -254,11 +303,53 @@ impl Default for BitString {
     }
 }
 
-bit_string_from!(u8);
-bit_string_from!(u16);
-bit_string_from!(u32);
-bit_string_from!(u64);
-bit_string_from!(u128);
+bit_string_from_val!(u8);
+bit_string_from_val!(u16);
+bit_string_from_val!(u32);
+bit_string_from_val!(u64);
+bit_string_from_val!(u128);
+
+bit_string_from_vec!(u8);
+bit_string_from_vec!(u16);
+bit_string_from_vec!(u32);
+bit_string_from_vec!(u64);
+bit_string_from_vec!(u128);
+
+impl<const N: usize> From<[Bit; N]> for BitString {
+    fn from(bits: [Bit; N]) -> Self {
+        let mut bs = BitString::with_capacity(N);
+
+        for bit in bits {
+            bs.append_bit(bit)
+        }
+
+        bs
+    }
+}
+
+impl From<&[Bit]> for BitString {
+    fn from(bits: &[Bit]) -> Self {
+        let mut bs = BitString::with_capacity(bits.len());
+
+        for bit in bits {
+            bs.append_bit(*bit)
+        }
+
+        bs
+    }
+}
+
+impl From<Vec<Bit>> for BitString {
+    fn from(value: Vec<Bit>) -> Self {
+        value.as_slice().into()
+    }
+}
+
+impl From<&Vec<Bit>> for BitString {
+    fn from(value: &Vec<Bit>) -> Self {
+        value.as_slice().into()
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -435,5 +526,73 @@ mod test {
         assert!(bit_string.set_exact_u8(1, 0b1111_1111u8).is_err());
 
         assert_eq!(bit_string.get_u8(0), 0b1111_1111u8);
+    }
+
+    #[test]
+    fn set_bit_long() {
+        let mut bs = BitString::from([u32::MAX, u32::MAX, 0, u32::MAX]);
+
+        bs.set_u32(64, u32::MAX);
+
+        for bit in bs {
+            assert_eq!(bit, Bit::On);
+        }
+    }
+
+    #[test]
+    fn as_vec() {
+        let bs = BitString::from(0b1100_1010u8);
+
+        let vec = bs.as_vec_exact_u8();
+
+        assert_eq!(vec, vec![0b1100_1010u8])
+    }
+
+    #[test]
+    fn as_vec_multi() {
+        let bs = BitString::from(0b1100_0011_0011_1100u16);
+
+        let vec = bs.as_vec_exact_u8();
+
+        assert_eq!(vec, vec![0b1100_0011u8, 0b0011_1100u8]);
+    }
+
+    #[test]
+    fn test_insert_u8() {
+        let mut bs = BitString::from(0b1111_1111u8);
+
+        bs.insert_u8(4, 0b0000_0000u8);
+
+        let byte_vec = bs.as_vec_exact_u8();
+        let expected = vec![0b1111_0000u8, 0b0000_1111u8];
+
+        println!("{bs:?}");
+        println!("stats: {}, ", bs.len());
+        println!("Byte vec: {byte_vec:?}");
+        println!("Expected: {expected:?}");
+
+        assert_eq!(byte_vec, expected);
+    }
+
+    #[test]
+    fn bs_equals_vec() {
+        let bs = BitString::from(0b0011_1100_1101_0010u16);
+
+        let vec = bs.as_vec_exact_u8();
+
+        let bs_from_vec = BitString::from(vec);
+
+        assert_eq!(bs, bs_from_vec);
+    }
+
+    #[test]
+    fn bs_equals_vec_long() {
+        let bs = BitString::from(0b0011_1100_1101_0010_0011_1010_0101_1100u32);
+
+        let vec = bs.as_vec_exact_u8();
+
+        let bs_from_vec = BitString::from(vec);
+
+        assert_eq!(bs, bs_from_vec);
     }
 }

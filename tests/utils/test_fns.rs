@@ -1,17 +1,19 @@
 use std::{rc::Rc, sync::mpsc::Receiver, time::Duration};
 
 use network_sim::{
-    corruption_type::Corruption, mac_address::MacAddressGenerator, physical_layer::cable::Cable,
+    bit::Bit, bit_string::BitString, corruption_type::Corruption, mac_address::MacAddressGenerator,
+    physical_layer::cable::Cable,
 };
 
 use super::test_structs::TestUser;
 
-pub fn bits_flipped<'a>(data1: &'a [u8], data2: &'a [u8]) -> u32 {
-    assert_eq!(data1.len(), data2.len());
+pub fn bits_flipped_slice_bit_vec(slice: &[u8], vec: &Vec<Bit>) -> u32 {
+    let slice_bs: BitString = slice.into();
+    let vec_bs: BitString = vec.into();
 
     let mut difference: u32 = 0;
-    for i in 0..data1.len() {
-        difference += (data1[i] ^ data2[i]).count_ones();
+    for i in 0..slice_bs.len() {
+        difference += (slice_bs[i] ^ vec_bs[i]) as u32;
     }
 
     difference
@@ -24,9 +26,9 @@ pub fn create_cable(
 ) -> (
     Cable,
     Rc<TestUser>,
-    Receiver<u8>,
+    Receiver<Bit>,
     Rc<TestUser>,
-    Receiver<u8>,
+    Receiver<Bit>,
 ) {
     let mut mac_gen = MacAddressGenerator::new(6969);
 
@@ -45,4 +47,11 @@ pub fn create_cable(
     );
 
     (cable, node1, rx1, node2, rx2)
+}
+
+pub fn equals_bit_vec_and_byte_slice(vec: Vec<Bit>, slice: &[u8]) -> bool {
+    let recv_bs: BitString = vec.as_slice().into();
+    let test_msg_bs: BitString = slice.into();
+
+    recv_bs == test_msg_bs
 }

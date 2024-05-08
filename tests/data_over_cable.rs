@@ -1,12 +1,15 @@
 #[path = "utils/mod.rs"]
 mod test_utils;
 
-use crate::test_utils::test_fns::{bits_flipped, create_cable};
+use crate::test_utils::test_fns::{
+    bits_flipped_slice_bit_vec, create_cable, equals_bit_vec_and_byte_slice,
+};
 
 pub use std::time::Duration;
 use std::time::Instant;
 
-use network_sim::{corruption_type::Corruption, hardware::Node, rand::XorShift};
+use network_sim::rand::XorShift;
+use network_sim::{bit::Bit, corruption_type::Corruption, hardware::Node};
 
 const ASCII_TEST_MSG: &[u8] = "Hello world!".as_bytes();
 
@@ -17,19 +20,15 @@ fn send_data_clean() -> anyhow::Result<()> {
 
     let data = ASCII_TEST_MSG;
 
-    cable.send_data(
-        usr1.as_ref().get_mac(),
-        usr2.as_ref().get_mac(),
-        data.to_vec(),
-    )?;
+    cable.send_bits(*usr1.get_mac(), 30, 40, data.into())?;
 
     // No pending values
     assert!(rx1.try_iter().count() == 0);
 
-    let recv_data = rx2.try_iter().collect::<Vec<u8>>();
+    let recv_data = rx2.try_iter().collect::<Vec<Bit>>();
 
     // Pending hello world
-    assert!(recv_data.as_slice() == ASCII_TEST_MSG);
+    assert!(equals_bit_vec_and_byte_slice(recv_data, ASCII_TEST_MSG));
 
     Ok(())
 }
@@ -43,18 +42,14 @@ fn send_data_one_flip() -> anyhow::Result<()> {
 
     let data = ASCII_TEST_MSG;
 
-    cable.send_data(
-        usr1.as_ref().get_mac(),
-        usr2.as_ref().get_mac(),
-        data.to_vec(),
-    )?;
+    cable.send_bits(*usr1.get_mac(), 30, 40, data.into())?;
 
     // No pending values
     assert!(rx1.try_iter().count() == 0);
 
-    let recv_data = rx2.try_iter().collect::<Vec<u8>>();
+    let recv_data = rx2.try_iter().collect::<Vec<Bit>>();
 
-    assert!(bits_flipped(data, recv_data.as_slice()) == 1);
+    assert!(bits_flipped_slice_bit_vec(data, &recv_data) == 1);
 
     Ok(())
 }
@@ -71,11 +66,7 @@ fn correct_latency() -> anyhow::Result<()> {
     let (mut cable, usr1, _rx1, usr2, rx2) = create_cable(latency, corruption, 100);
 
     let start = Instant::now();
-    cable.send_data(
-        usr1.as_ref().get_mac(),
-        usr2.as_ref().get_mac(),
-        data.to_vec(),
-    )?;
+    cable.send_bits(*usr1.get_mac(), 30, 40, data.into())?;
 
     for _ in 0..data.len() {
         assert!(rx2.recv_timeout(Duration::from_millis(100)).is_ok());
@@ -101,11 +92,7 @@ fn correct_throughput() -> anyhow::Result<()> {
     let (mut cable, usr1, _rx1, usr2, rx2) = create_cable(latency, corruption, throughput_per_ms);
 
     let start = Instant::now();
-    cable.send_data(
-        usr1.as_ref().get_mac(),
-        usr2.as_ref().get_mac(),
-        data.to_vec(),
-    )?;
+    cable.send_bits(*usr1.get_mac(), 30, 40, data.into())?;
 
     for _ in 0..data.len() {
         assert!(rx2.recv_timeout(Duration::from_millis(100)).is_ok());

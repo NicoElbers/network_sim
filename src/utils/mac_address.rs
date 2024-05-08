@@ -1,6 +1,6 @@
 use super::rand::XorShift;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MacAddress {
     addr: [u8; 6],
 }
