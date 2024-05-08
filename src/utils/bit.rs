@@ -4,16 +4,24 @@ use crate::macros::{bit_into_type, bit_try_from};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Bit {
-    On,
-    Off,
+    // The numbering is important as otherwise switching the order in code could
+    // affect the "as" operator
+    Off = 0,
+    On = 1,
 }
 
 impl Bit {
+    pub const BITS: u32 = 1;
+
     pub fn stringify(&self) -> &str {
         match self {
             Bit::Off => "0",
             Bit::On => "1",
         }
+    }
+
+    pub fn flip(&mut self) {
+        *self ^= Bit::On
     }
 }
 
