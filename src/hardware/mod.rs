@@ -9,7 +9,6 @@ use std::{
 use easy_threadpool::ThreadPool;
 
 use crate::{
-    bit::Bit,
     bit_string::BitString,
     physical_layer::cable::{Cable, CableContext},
     utils::mac_address::{MacAddress, MacAddressGenerator},
