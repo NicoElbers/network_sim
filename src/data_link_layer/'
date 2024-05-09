@@ -153,7 +153,7 @@ impl TCPFrameBuilder {
             window_size,
             checksum,
             urgent_pointer,
-            options,
+            options 
             data,
             output_bitstring: full_bitstring,
         }
@@ -181,22 +181,28 @@ impl TCPFrameBuilder {
     }
 
     pub fn set_ack_num(self, ack_num: u32) -> Self {
-        Self { ack_num, ..self }
+        Self {
+            ack_num: Some(ack_num),
+            ..self
+        }
     }
 
     pub fn set_data_offset(self, data_offset: u8) -> Self {
         Self {
-            data_offset,
+            data_offset: Some(data_offset),
             ..self
         }
     }
 
     pub fn set_flag(self, flag: u8) -> Self {
-        let mut flag_byte = self.flag_byte;
+        let mut flags = self.flag_byte;
 
-        flag_byte |= flag;
+        flags |= flag;
 
-        Self { flag_byte, ..self }
+        Self {
+            flag_byte,
+            ..self
+        }
     }
 
     pub fn set_window_size(self, window_size: u16) -> Self {
@@ -214,7 +220,10 @@ impl TCPFrameBuilder {
     }
 
     pub fn set_options(self, options: [u32; 9]) -> Self {
-        Self { options, ..self }
+        Self {
+            options,
+            ..self
+        }
     }
 }
 
@@ -225,7 +234,6 @@ impl Default for TCPFrameBuilder {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct TCPFrame {
     // Header
     source_port: u16,

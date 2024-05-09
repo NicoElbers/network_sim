@@ -6,6 +6,8 @@ use std::{
     },
 };
 
+use easy_threadpool::ThreadPool;
+
 use crate::{
     bit::Bit,
     bit_string::BitString,
@@ -21,8 +23,6 @@ pub trait Node: Debug {
     fn add_connection(&mut self, cable: Arc<Cable>);
 
     fn get_connections(&self) -> &Vec<Arc<Cable>>;
-
-    fn receive_bit(&self, bit: Bit);
 
     fn send_bit_mac(
         source_mac: MacAddress,
@@ -54,6 +54,7 @@ pub struct Router {
     receiver: Receiver<CableContext>,
     transmitter: Arc<Sender<CableContext>>,
     is_edge_router: bool,
+    runtime: ThreadPool,
 }
 
 impl Node for Router {
@@ -75,15 +76,14 @@ impl Node for Router {
     fn get_transmitter(&self) -> Arc<Sender<CableContext>> {
         self.transmitter.clone()
     }
-
-    #[allow(dead_code)]
-    fn receive_bit(&self, _bit: Bit) {
-        todo!()
-    }
 }
 
 impl Router {
-    pub fn new(is_edge_router: bool, mac_address_gen: &mut MacAddressGenerator) -> Self {
+    pub fn new(
+        is_edge_router: bool,
+        mac_address_gen: &mut MacAddressGenerator,
+        threadpool: ThreadPool,
+    ) -> Self {
         let mac = mac_address_gen.gen_addr();
 
         let (tx, rx) = channel::<CableContext>();
@@ -95,6 +95,7 @@ impl Router {
             receiver: rx,
             connections: Vec::new(),
             is_edge_router,
+            runtime: threadpool,
         }
     }
 
@@ -151,10 +152,5 @@ impl Node for User {
 
     fn get_transmitter(&self) -> Arc<Sender<CableContext>> {
         self.transmitter.clone()
-    }
-
-    #[allow(dead_code)]
-    fn receive_bit(&self, _bit: Bit) {
-        todo!()
     }
 }

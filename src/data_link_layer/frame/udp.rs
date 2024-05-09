@@ -2,23 +2,28 @@ use crate::bit_string::BitString;
 
 use super::Frame;
 
+#[allow(dead_code)]
+pub struct UDPBuilder {}
+
 #[derive(Debug)]
 pub struct UDPFrame {
     bs: BitString,
 }
 
+#[allow(dead_code)]
 impl UDPFrame {
-    pub fn new(data: BitString) -> Self {
+    pub fn new(_data: BitString) -> Self {
         unimplemented!("Implement UDP mfer");
-        Self { bs: data }
+        Self { bs: _data }
     }
 }
 
 // TODO: Do this implementation
-impl Frame for UDPFrame {
-    fn setup_frames(data: BitString) -> Vec<Self> {
+#[allow(dead_code)]
+impl Frame<UDPFrame> for UDPFrame {
+    fn setup_frames(_data: BitString, _builder: UDPFrame) -> Vec<Self> {
         unimplemented!("Implement UDP mfer");
-        vec![Self { bs: data }]
+        vec![Self { bs: _data }]
     }
 
     fn to_bit_string(&self) -> BitString {

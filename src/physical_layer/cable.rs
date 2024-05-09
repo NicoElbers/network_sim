@@ -16,9 +16,9 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct CableContext {
-    bit: Bit,
-    source_port: u16,
-    target_port: u16,
+    pub bit: Bit,
+    pub source_port: u16,
+    pub target_port: u16,
 }
 
 #[derive(Debug)]

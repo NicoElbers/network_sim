@@ -3,8 +3,8 @@ use crate::bit_string::BitString;
 pub mod tcp;
 pub mod udp;
 
-pub trait Frame {
-    fn setup_frames(data: BitString) -> Vec<Self>
+pub trait Frame<T> {
+    fn setup_frames(data: BitString, builder: T) -> Vec<Self>
     where
         Self: Sized;
 

@@ -7,40 +7,51 @@ use crate::{bit_string::BitString, mac_address::MacAddress, physical_layer::cabl
 
 use self::{
     bit_stuffing::prepare_bits,
-    frame::{tcp::TCPFrame, Frame},
+    frame::{
+        tcp::{TCPFrame, TCPFrameBuilder},
+        Frame,
+    },
 };
 
 pub(crate) mod bit_stuffing;
 pub(crate) mod frame;
 
-pub struct DataLinkLayer<F: Frame> {
+pub struct DataLinkLayer<B, F: Frame<B>> {
     frame_type: PhantomData<F>,
+    builder_type: PhantomData<B>,
 }
 
-impl<F: Frame> Default for DataLinkLayer<F> {
+impl<B, F: Frame<B>> Default for DataLinkLayer<B, F> {
     fn default() -> Self {
         Self {
             frame_type: PhantomData::<F>,
+            builder_type: PhantomData::<B>,
         }
     }
 }
 
-impl DataLinkLayer<TCPFrame> {
+impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
     pub fn new() -> Self {
         Self {
             frame_type: PhantomData::<TCPFrame>,
+            builder_type: PhantomData::<TCPFrameBuilder>,
         }
     }
 
     pub fn data_link_layer(
-        window_size: usize,
+        window_size: u16,
         source_mac: MacAddress,
         source_port: u16,
         target_port: u16,
         cable: Arc<Mutex<Cable>>,
         data: BitString,
     ) -> anyhow::Result<()> {
-        let data: Vec<TCPFrame> = TCPFrame::setup_frames(data);
+        let tcp_builder = TCPFrameBuilder::new()
+            .set_source_port(source_port)
+            .set_target_port(target_port)
+            .set_window_size(window_size);
+
+        let data: Vec<TCPFrame> = TCPFrame::setup_frames(data, tcp_builder);
 
         Self::sliding_window(
             window_size,
@@ -53,14 +64,14 @@ impl DataLinkLayer<TCPFrame> {
     }
 
     fn sliding_window(
-        window_size: usize,
+        window_size: u16,
         source_mac: MacAddress,
         source_port: u16,
         target_port: u16,
         cable: Arc<Mutex<Cable>>,
         data: Vec<TCPFrame>,
     ) -> anyhow::Result<()> {
-        let windows = data.windows(window_size);
+        let windows = data.windows(window_size.into());
 
         // TODO: Fix this implementation
         for window in windows {
