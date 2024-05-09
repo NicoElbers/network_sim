@@ -7,6 +7,31 @@ pub fn prepare_bits(data: BitString) -> BitString {
     surround_flags(bs)
 }
 
+fn decode_bits(mut data: BitString) -> BitString {
+    let mut count = 0;
+    let mut remove_places = Vec::new();
+
+    //                              I hate this notation
+    for (idx, bit) in (&data).into_iter().enumerate() {
+        match bit {
+            Bit::On => count += 1,
+            Bit::Off => {
+                if count == 5 {
+                    remove_places.push(idx);
+                }
+
+                count = 0;
+            }
+        }
+    }
+
+    for &idx in remove_places.iter().rev() {
+        data.remove_bit(idx);
+    }
+
+    data
+}
+
 fn stuff_bits(mut data: BitString) -> BitString {
     let mut count = 0;
     let mut insert_places = Vec::new();
@@ -41,7 +66,7 @@ fn surround_flags(mut data: BitString) -> BitString {
 mod test {
     use crate::{bit::Bit, bit_string::BitString, data_link_layer::bit_stuffing::FLAG_SEQUECE};
 
-    use super::{stuff_bits, surround_flags};
+    use super::{decode_bits, stuff_bits, surround_flags};
 
     #[test]
     fn surround_flags_test() {
@@ -51,6 +76,51 @@ mod test {
 
         assert_eq!(bs.get_u8(0), FLAG_SEQUECE);
         assert_eq!(bs.get_u8(bs.len() - 8), FLAG_SEQUECE);
+    }
+
+    #[test]
+    fn unstuff_bits_test() {
+        let expected = BitString::from([
+            Bit::Off,
+            Bit::Off,
+            Bit::On,
+            Bit::On,
+            Bit::Off,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::Off,
+            Bit::Off,
+        ]);
+        let bs = BitString::from([
+            Bit::Off,
+            Bit::Off,
+            Bit::On,
+            Bit::On,
+            Bit::Off,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::Off,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::On,
+            Bit::Off,
+            Bit::Off,
+        ]);
+
+        let bs = decode_bits(bs);
+
+        assert_eq!(expected, bs);
     }
 
     #[test]
@@ -74,8 +144,6 @@ mod test {
             Bit::Off,
         ]);
 
-        println!("{:?}", BitString::from(FLAG_SEQUECE));
-        println!("{:?}", bs);
         let bs = stuff_bits(bs);
         let expected = BitString::from([
             Bit::Off,
