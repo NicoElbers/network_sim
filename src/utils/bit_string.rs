@@ -3,7 +3,7 @@ use std::{
     fmt::Display,
     iter::once,
     ops::{Index, IndexMut, Shl, ShlAssign, Shr, ShrAssign},
-    vec::IntoIter,
+    vec::{Drain, IntoIter},
 };
 
 use anyhow::ensure;
@@ -75,6 +75,18 @@ impl BitString {
     insert_type!(u32);
     insert_type!(u64);
     insert_type!(u128);
+
+    pub fn remove_len(&mut self, index: usize, len: usize) -> Drain<Bit> {
+        assert!(index + len < self.bit_vec.len());
+
+        self.bit_vec.drain(index..index + len)
+    }
+
+    pub fn remove_bit(&mut self, index: usize) -> Bit {
+        assert!(index < self.bit_vec.len());
+
+        self.bit_vec.remove(index)
+    }
 
     get_type!(u8);
     get_type!(u16);
