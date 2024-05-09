@@ -1,5 +1,6 @@
 use core::slice;
 use std::{
+    fmt::Display,
     iter::once,
     ops::{Index, IndexMut, Shl, ShlAssign, Shr, ShrAssign},
     vec::IntoIter,
@@ -18,6 +19,22 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BitString {
     bit_vec: Vec<Bit>,
+}
+
+impl Display for BitString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut str = String::with_capacity(self.len() + 8);
+        str.push_str("BitString<");
+        for bit in self.bit_vec.clone() {
+            match bit {
+                Bit::On => str.push('1'),
+                Bit::Off => str.push('0'),
+            }
+        }
+        str.push('>');
+
+        write!(f, "{str}")
+    }
 }
 
 impl BitString {
@@ -594,5 +611,74 @@ mod test {
         let bs_from_vec = BitString::from(vec);
 
         assert_eq!(bs, bs_from_vec);
+    }
+
+    #[test]
+    fn append_zero_test() {
+        let mut bs = BitString::new();
+
+        bs.append_u16(0);
+
+        assert!(bs.len() == 16);
+
+        bs.append_u16(0);
+
+        assert!(bs.len() == 32);
+
+        assert!(bs.get_u32(0) == 0);
+    }
+
+    #[test]
+    fn append_zero_and_insert_test() {
+        let mut bs = BitString::new();
+
+        bs.append_u16(0);
+
+        assert!(bs.len() == 16);
+
+        bs.append_u16(0);
+
+        assert!(bs.len() == 32);
+
+        bs.append_u16(0);
+
+        assert!(bs.len() == 48);
+
+        bs.set_u16(16, u16::MAX);
+
+        assert!(bs.len() == 48);
+
+        assert!(bs.get_u16(16) == u16::MAX);
+        assert!(bs.get_u16(0) == 0);
+        assert!(bs.get_u16(32) == 0);
+    }
+
+    #[test]
+    fn get_and_set1() {
+        let mut bs = BitString::from(u64::MAX);
+
+        const TEST_DATA: u16 = 0b1010_0000_0101_1111u16;
+
+        assert_eq!(bs.get_u16(0), u16::MAX);
+        assert_eq!(bs.get_u16(16), u16::MAX);
+        assert_eq!(bs.get_u16(16), u16::MAX);
+        bs.set_u16(16, TEST_DATA);
+        assert_eq!(bs.get_u16(0), u16::MAX);
+        assert_eq!(BitString::from(bs.get_u16(16)), BitString::from(TEST_DATA));
+        assert_eq!(bs.get_u16(32), u16::MAX);
+    }
+    #[test]
+    fn get_and_set2() {
+        let mut bs = BitString::from(u64::MAX);
+
+        const TEST_DATA: u16 = 0b1010_1010_1010_1010u16;
+
+        assert_eq!(bs.get_u16(0), u16::MAX);
+        assert_eq!(bs.get_u16(16), u16::MAX);
+        assert_eq!(bs.get_u16(16), u16::MAX);
+        bs.set_u16(16, TEST_DATA);
+        assert_eq!(bs.get_u16(0), u16::MAX);
+        assert_eq!(BitString::from(bs.get_u16(16)), BitString::from(TEST_DATA));
+        assert_eq!(bs.get_u16(32), u16::MAX);
     }
 }

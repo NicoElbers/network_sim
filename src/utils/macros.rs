@@ -126,9 +126,10 @@ macro_rules! set_type {
                     .iter_mut()
                     .skip(index)
                     .take(bit_size as usize)
+                    .rev()
                     .enumerate()
                     .for_each(|(idx, bit)| {
-                        let (shifted_data, _) = data.overflowing_shr(bit_size - idx as u32);
+                        let (shifted_data, _) = data.overflowing_shr(idx as u32);
 
                         *bit = Bit::try_from(shifted_data & mask)
                             .expect("This is ensured to work because we mask with 0b1");
