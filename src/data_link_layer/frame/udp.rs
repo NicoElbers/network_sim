@@ -26,8 +26,8 @@ impl Frame<UDPFrame> for UDPFrame {
         vec![Self { bs: _data }]
     }
 
-    fn to_bit_string(&self) -> BitString {
+    fn as_bit_string(&self) -> &BitString {
         unimplemented!("Implement UDP mfer");
-        self.bs.clone()
+        &self.bs
     }
 }

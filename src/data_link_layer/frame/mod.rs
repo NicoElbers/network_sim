@@ -8,5 +8,5 @@ pub trait Frame<T> {
     where
         Self: Sized;
 
-    fn to_bit_string(&self) -> BitString;
+    fn as_bit_string(&self) -> &BitString;
 }

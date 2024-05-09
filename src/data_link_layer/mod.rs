@@ -75,7 +75,7 @@ impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
 
         // TODO: Fix this implementation
         for window in windows {
-            let data = window[0].to_bit_string();
+            let data = window[0].as_bit_string().clone();
             let data = prepare_bits(data);
             cable
                 .lock()
