@@ -51,6 +51,17 @@ impl XorShift {
         output
     }
 
+    pub fn next_int_bound(&mut self, min: u128, max: u128) -> u128 {
+        assert!(min <= max, "Min must be smaller than max");
+        if min == max {
+            return min;
+        }
+
+        let diff = max - min;
+
+        min + (self.next_int() % diff)
+    }
+
     pub fn next_bound(&mut self, min: f64, max: f64) -> f64 {
         let diff = max - min;
         let next = self.next_01();
