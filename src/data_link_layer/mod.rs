@@ -1,3 +1,7 @@
+pub(crate) mod bit_stuffing;
+pub(crate) mod crc;
+pub(crate) mod frame;
+
 use std::{
     marker::PhantomData,
     sync::{Arc, Mutex},
@@ -12,9 +16,6 @@ use self::{
         Frame,
     },
 };
-
-pub(crate) mod bit_stuffing;
-pub(crate) mod frame;
 
 pub struct DataLinkLayer<B, F: Frame<B>> {
     frame_type: PhantomData<F>,
@@ -38,7 +39,7 @@ impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
         }
     }
 
-    pub fn data_link_layer(
+    pub fn send_bits(
         window_size: u16,
         source_mac: MacAddress,
         source_port: u16,

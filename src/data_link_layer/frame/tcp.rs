@@ -111,7 +111,7 @@ impl TCPFrameBuilder {
             }
         }
 
-        output_bitstring.append_bits(data.as_bit_slice());
+        output_bitstring.append_bits(data.clone());
 
         // pad with zeros
         for _ in 0..(output_bitstring.len() % 16) {
@@ -134,11 +134,6 @@ impl TCPFrameBuilder {
         let checksum: u16 = !(sum as u16);
 
         output_bitstring.set_u16(128, checksum);
-        assert_eq!(
-            BitString::from(output_bitstring.get_u16(128)),
-            BitString::from(checksum),
-            "AAAAAAaa"
-        );
 
         assert!(output_bitstring.len() % 16 == 0);
 
