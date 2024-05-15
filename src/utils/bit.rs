@@ -1,4 +1,7 @@
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
+use std::{
+    fmt::Display,
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
+};
 
 use crate::macros::{bit_into_type, bit_try_from};
 
@@ -22,6 +25,15 @@ impl Bit {
 
     pub fn flip(&mut self) {
         *self ^= Bit::On
+    }
+}
+
+impl Display for Bit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Bit::On => write!(f, "1"),
+            Bit::Off => write!(f, "0"),
+        }
     }
 }
 
