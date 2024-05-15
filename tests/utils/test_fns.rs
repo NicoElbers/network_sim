@@ -1,8 +1,4 @@
-use std::{
-    rc::Rc,
-    sync::{mpsc::Receiver, Arc},
-    time::Duration,
-};
+use std::{rc::Rc, time::Duration};
 
 use network_sim::{
     bit::Bit,
@@ -14,7 +10,7 @@ use network_sim::{
 
 use super::test_structs::TestUser;
 
-pub fn bits_flipped_slice_bit_vec(slice: &[u8], vec: &Vec<CableContext>) -> u32 {
+pub fn bits_flipped_slice_bit_vec(slice: &[u8], vec: &[CableContext]) -> u32 {
     let slice_bs: BitString = slice.into();
     let vec_bs: BitString = vec
         .iter() //
