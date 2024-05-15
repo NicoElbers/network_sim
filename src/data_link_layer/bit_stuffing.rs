@@ -7,21 +7,19 @@ pub fn prepare_bits(data: BitString) -> BitString {
     surround_flags(bs)
 }
 
-fn decode_bits(mut data: BitString) -> BitString {
+fn unstuff_bits(mut data: BitString) -> BitString {
     let mut count = 0;
     let mut remove_places = Vec::new();
 
     //                              I hate this notation
     for (idx, bit) in (&data).into_iter().enumerate() {
+        if count == 5 {
+            remove_places.push(idx);
+        }
+
         match bit {
             Bit::On => count += 1,
-            Bit::Off => {
-                if count == 5 {
-                    remove_places.push(idx);
-                }
-
-                count = 0;
-            }
+            Bit::Off => count = 0,
         }
     }
 
@@ -38,14 +36,14 @@ fn stuff_bits(mut data: BitString) -> BitString {
 
     //                              I hate this notation
     for (idx, bit) in (&data).into_iter().enumerate() {
+        if count == 5 {
+            insert_places.push(idx);
+            count = 0;
+        }
+
         match bit {
             Bit::Off => count = 0,
             Bit::On => count += 1,
-        }
-
-        if count == 6 {
-            insert_places.push(idx);
-            count = 0;
         }
     }
 
@@ -64,9 +62,22 @@ fn surround_flags(mut data: BitString) -> BitString {
 
 #[cfg(test)]
 mod test {
-    use crate::{bit::Bit, bit_string::BitString, data_link_layer::bit_stuffing::FLAG_SEQUECE};
+    use crate::{
+        bit_string::BitString, bitstring, data_link_layer::bit_stuffing::FLAG_SEQUECE,
+        rand::XorShift,
+    };
 
-    use super::{decode_bits, stuff_bits, surround_flags};
+    use super::{stuff_bits, surround_flags, unstuff_bits};
+
+    fn generate_random_data<const N: usize>(seed: u128) -> [u8; N] {
+        let mut rand = XorShift::new(seed);
+        let mut data: [u8; N] = [0; N];
+
+        data.iter_mut()
+            .for_each(|el| *el = (rand.next_int() & u8::MAX as u128) as u8);
+
+        data
+    }
 
     #[test]
     fn surround_flags_test() {
@@ -80,92 +91,40 @@ mod test {
 
     #[test]
     fn unstuff_bits_test() {
-        let expected = BitString::from([
-            Bit::Off,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::Off,
-        ]);
-        let bs = BitString::from([
-            Bit::Off,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::Off,
-        ]);
+        let expected = bitstring!(0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,);
+        let bs = bitstring![0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0,];
 
-        let bs = decode_bits(bs);
+        let bs = unstuff_bits(bs);
 
         assert_eq!(expected, bs);
     }
 
     #[test]
     fn stuff_bits_test() {
-        let bs = BitString::from([
-            Bit::Off,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::Off,
-        ]);
+        let bs = bitstring![0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,];
 
         let bs = stuff_bits(bs);
-        let expected = BitString::from([
-            Bit::Off,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::On,
-            Bit::Off,
-            Bit::Off,
-        ]);
+        let expected = bitstring![0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0,];
 
         println!("{:?}", bs);
         assert_eq!(expected, bs);
+    }
+
+    #[test]
+    fn stuffing_fuzz() {
+        for seed in 0..=1024 {
+            let bs = BitString::from(generate_random_data::<125>(seed));
+            let bs_clone = bs.clone();
+
+            let stuffed = stuff_bits(bs);
+            let unstuffed = unstuff_bits(stuffed.clone());
+
+            // println!("---");
+            // println!("{bs_clone}");
+            // println!("{stuffed}");
+            // println!("{unstuffed}");
+
+            assert_eq!(bs_clone, unstuffed, "Failed with seed {}", seed);
+        }
     }
 }
