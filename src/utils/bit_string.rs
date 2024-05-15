@@ -23,15 +23,15 @@ pub struct BitString {
 
 impl Display for BitString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut str = String::with_capacity(self.len() + 8);
-        str.push_str("BitString<");
+        let mut str = String::with_capacity(self.len() + 11);
+        str.push_str("BitString[");
         for bit in self.bit_vec.clone() {
             match bit {
                 Bit::On => str.push('1'),
                 Bit::Off => str.push('0'),
             }
         }
-        str.push('>');
+        str.push(']');
 
         write!(f, "{str}")
     }
@@ -77,15 +77,30 @@ impl BitString {
     insert_type!(u128);
 
     pub fn remove_len(&mut self, index: usize, len: usize) -> Drain<Bit> {
-        assert!(index + len < self.bit_vec.len());
+        assert!(
+            index + len <= self.len(),
+            "Trying to remove index out of bounds"
+        );
 
         self.bit_vec.drain(index..index + len)
     }
 
     pub fn remove_bit(&mut self, index: usize) -> Bit {
-        assert!(index < self.bit_vec.len());
+        assert!(index < self.len(), "Trying to remove index out of bounds");
 
         self.bit_vec.remove(index)
+    }
+
+    pub fn remove_last_len(&mut self, len: usize) -> Drain<Bit> {
+        assert!(len <= self.len(), "Trying to remove index out of bounds");
+
+        let index = self.len() - len;
+
+        self.remove_len(index, len)
+    }
+
+    pub fn remove_last(&mut self) -> Option<Bit> {
+        self.bit_vec.pop()
     }
 
     get_type!(u8);
@@ -94,6 +109,15 @@ impl BitString {
     get_type!(u64);
     get_type!(u128);
 
+    pub fn copy_len(&self, index: usize, len: usize) -> BitString {
+        self.bit_vec
+            .iter()
+            .skip(index)
+            .take(len)
+            .copied()
+            .collect::<BitString>()
+    }
+
     set_type!(u8);
     set_type!(u16);
     set_type!(u32);
@@ -101,9 +125,23 @@ impl BitString {
     set_type!(u128);
 
     pub fn set_bit(&mut self, index: usize, bit: Bit) {
-        assert!(index < self.bit_vec.len());
+        assert!(index < self.len(), "Trying to set index out of bounds");
 
         *self.get_bit_mut(index) = bit;
+    }
+
+    pub fn set_bits(&mut self, index: usize, bits: &BitString) {
+        assert!(
+            index + bits.len() <= self.len(),
+            "Trying to set index out of bounds"
+        );
+
+        self.bit_vec
+            .iter_mut()
+            .skip(index)
+            .take(bits.len())
+            .enumerate()
+            .for_each(|(idx, bit)| *bit = bits[idx]);
     }
 
     bit_string_as_vec!(u8);
@@ -121,8 +159,7 @@ impl BitString {
     }
 
     pub fn flip_bits(&mut self, index: usize, length: usize) {
-        assert!(length > 0);
-        assert!(index < self.bit_vec.len());
+        assert!(index < self.len(), "Trying to flip index out of bounds");
 
         self.bit_vec
             .iter_mut()
@@ -153,8 +190,11 @@ impl BitString {
         self.bit_vec.push(bit);
     }
 
-    pub fn append_bits(&mut self, bits: &[Bit]) {
-        self.bit_vec = [self.bit_vec.as_slice(), bits].concat();
+    pub fn append_bits<T>(&mut self, bits: T)
+    where
+        T: Into<Vec<Bit>>,
+    {
+        self.bit_vec.append(&mut bits.into())
     }
 
     pub fn append_zeroes(&mut self, amount: usize) {
@@ -167,15 +207,58 @@ impl BitString {
         self.bit_vec.resize(new_len, Bit::On);
     }
 
-    pub fn insert_bit(&mut self, index: usize, bit: Bit) {
-        assert!(index < self.bit_vec.len());
+    pub fn insert_bit<T>(&mut self, index: usize, bit: T)
+    where
+        T: Into<Bit>,
+    {
+        assert!(
+            index < self.bit_vec.len(),
+            "Trying to insert index out of bounds"
+        );
         self.bit_vec.reserve(1);
 
-        self.bit_vec.splice(index..index, once(bit));
+        self.bit_vec.splice(index..index, once(bit.into()));
     }
 
     pub fn prepend_bit(&mut self, bit: Bit) {
-        self.insert_bit(0, bit)
+        if self.is_empty() {
+            self.append_bit(bit)
+        } else {
+            self.insert_bit(0, bit)
+        }
+    }
+
+    pub fn xor_on_index<'a, T>(&self, other: T, index: usize) -> BitString
+    where
+        T: Into<&'a BitString>,
+    {
+        let mut clone = self.clone();
+        clone.xor_assign_on_index(other, index);
+        clone
+    }
+
+    pub fn xor_assign_on_index<'a, T>(&mut self, other: T, index: usize)
+    where
+        T: Into<&'a BitString>,
+    {
+        let other: &BitString = Into::into(other);
+        assert!(
+            other.len() + index <= self.len(),
+            "Trying to xor bitstring with len {} until index {}",
+            self.len(),
+            other.len() + index
+        );
+
+        self.bit_vec
+            .iter_mut()
+            .skip(index)
+            .take(other.len())
+            .enumerate()
+            .for_each(|(idx, bit)| *bit ^= other[idx]);
+    }
+
+    pub fn reverse(&mut self) {
+        self.bit_vec.reverse();
     }
 
     pub fn as_bit_slice(&self) -> &[Bit] {
@@ -198,11 +281,19 @@ impl BitString {
         &mut self.bit_vec[index]
     }
 
-    pub fn get_inner(&self) -> &Vec<Bit> {
+    pub fn get_last(&self) -> Option<&Bit> {
+        self.bit_vec.last()
+    }
+
+    pub fn get_last_mut(&mut self) -> Option<&mut Bit> {
+        self.bit_vec.last_mut()
+    }
+
+    pub fn as_vec(&self) -> &Vec<Bit> {
         &self.bit_vec
     }
 
-    pub fn get_inner_mut(&mut self) -> &mut Vec<Bit> {
+    pub fn as_vec_mut(&mut self) -> &mut Vec<Bit> {
         &mut self.bit_vec
     }
 
@@ -368,6 +459,18 @@ impl From<&[Bit]> for BitString {
     }
 }
 
+impl From<BitString> for Vec<Bit> {
+    fn from(value: BitString) -> Self {
+        value.bit_vec
+    }
+}
+
+impl<'a> From<&'a BitString> for &'a Vec<Bit> {
+    fn from(value: &'a BitString) -> Self {
+        &value.bit_vec
+    }
+}
+
 impl From<Vec<Bit>> for BitString {
     fn from(value: Vec<Bit>) -> Self {
         value.as_slice().into()
@@ -380,6 +483,39 @@ impl From<&Vec<Bit>> for BitString {
     }
 }
 
+impl FromIterator<Bit> for BitString {
+    fn from_iter<T: IntoIterator<Item = Bit>>(iter: T) -> Self {
+        BitString::from(iter.into_iter().collect::<Vec<_>>())
+    }
+}
+
+impl<'a> FromIterator<&'a Bit> for BitString {
+    fn from_iter<T: IntoIterator<Item = &'a Bit>>(iter: T) -> Self {
+        BitString::from(iter.into_iter().copied().collect::<Vec<_>>())
+    }
+}
+
+impl<'a> From<Drain<'a, Bit>> for BitString {
+    fn from(value: Drain<'a, Bit>) -> Self {
+        BitString::from(value.into_iter().collect::<Vec<_>>())
+    }
+}
+
+#[macro_export]
+macro_rules! bitstring {
+    () => {
+        BitString::new()
+    };
+
+    ($($val:expr),* $(,)?) => {
+        $crate::utils::bit_string::BitString::from(
+            [$($crate::utils::bit::Bit::try_from($val as u8).unwrap()),*]
+        )
+    };
+}
+
+pub use bitstring;
+
 #[cfg(test)]
 mod test {
     use super::{Bit, BitString};
@@ -388,6 +524,26 @@ mod test {
     const BIT_ON: Bit = Bit::On;
     const BIT_OFF: Bit = Bit::Off;
     const U128: u128 = 0x1;
+
+    #[test]
+    fn test_macro() {
+        let bit_string_1 = bitstring!(1, 0, 1, 0, 1, 0, 1, 0);
+        let bit_string = BitString::from(0b1010_1010u8);
+
+        assert_eq!(bit_string_1, bit_string);
+    }
+
+    #[test]
+    #[should_panic]
+    fn macro_fail_big() {
+        let _ = bitstring!(2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn macro_fail_max() {
+        let _ = bitstring!(u128::MAX);
+    }
 
     #[test]
     fn shift_right() {
@@ -692,5 +848,68 @@ mod test {
         assert_eq!(bs.get_u16(0), u16::MAX);
         assert_eq!(BitString::from(bs.get_u16(16)), BitString::from(TEST_DATA));
         assert_eq!(bs.get_u16(32), u16::MAX);
+    }
+
+    #[test]
+    fn test_xor() {
+        let bs = BitString::from(0b0000_1111_1111_0000u16);
+        let other = BitString::from(0b1111_1111u8);
+
+        println!("{}", BitString::from(0b1111_0000_1111_0000u16));
+        println!("{}", bs.xor_on_index(&other, 0));
+        assert_eq!(
+            BitString::from(0b1111_0000_1111_0000u16),
+            bs.xor_on_index(&other, 0),
+            "Failed on start xor"
+        );
+
+        assert_eq!(
+            BitString::from(0b0000_0000_0000_0000u16),
+            bs.xor_on_index(&other, 4),
+            "Failed on middle xor"
+        );
+
+        assert_eq!(
+            BitString::from(0b0000_1111_0000_1111u16),
+            bs.xor_on_index(&other, 8),
+            "Failed on end xor"
+        );
+    }
+
+    #[test]
+    fn remove_last() {
+        let mut bs = bitstring!(1, 1, 1, 1, 0, 0);
+
+        let rem: BitString = bs.remove_last_len(2).collect();
+
+        assert_eq!(2, rem.len());
+        assert_eq!(bitstring!(0, 0), rem);
+        assert_eq!(bitstring!(1, 1, 1, 1), bs);
+    }
+
+    #[test]
+    fn remove_last_order() {
+        let mut bs = bitstring!(1, 0);
+
+        let rem: BitString = bs.remove_last_len(2).collect();
+
+        assert_eq!(2, rem.len());
+        assert!(bs.is_empty());
+
+        assert_eq!(bitstring!(1, 0), rem);
+    }
+
+    #[test]
+    fn test_set_bits() {
+        let mut bs = bitstring!(0, 0);
+
+        bs.set_bits(0, &bitstring!(1, 1));
+
+        assert_eq!(bitstring!(1, 1), bs);
+
+        bs = bitstring!(0, 0, 0);
+        bs.set_bits(1, &bitstring!(1, 0));
+
+        assert_eq!(bitstring!(0, 1, 0), bs);
     }
 }
