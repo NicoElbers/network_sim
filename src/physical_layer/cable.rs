@@ -76,7 +76,7 @@ impl Cable {
         source_mac: MacAddress,
         source_port: u16,
         target_port: u16,
-        mut data: BitString,
+        data: BitString,
     ) -> anyhow::Result<()> {
         let dest = if self.node1_mac == source_mac {
             self.node2_transmitter.clone()
@@ -88,7 +88,7 @@ impl Cable {
 
         sleep(self.latency);
 
-        self.corruption_type.corrupt_borrow(&mut data);
+        let data = self.corruption_type.corrupt_borrow(data);
 
         for bit in data {
             dest.send(CableContext {

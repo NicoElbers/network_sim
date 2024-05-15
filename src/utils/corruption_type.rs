@@ -16,14 +16,11 @@ pub enum Corruption {
 }
 
 impl Corruption {
-    pub fn corrupt(mut self, data: &mut BitString) {
-        self.corrupt_borrow(data);
+    pub fn corrupt(mut self, data: BitString) -> BitString {
+        self.corrupt_borrow(data)
     }
 
-    pub fn corrupt_borrow<'a, 'b>(&'a mut self, data: &'b mut BitString)
-    where
-        'b: 'a,
-    {
+    pub fn corrupt_borrow(&mut self, data: BitString) -> BitString {
         assert!(!data.is_empty());
 
         match self {
@@ -40,27 +37,30 @@ impl Corruption {
         }
     }
 
-    fn no_corruption(_data: &mut BitString) {}
+    fn no_corruption(data: BitString) -> BitString {
+        data
+    }
 
-    fn one_bit_flip(rand: &mut XorShift, data: &mut BitString) {
+    fn one_bit_flip(rand: &mut XorShift, mut data: BitString) -> BitString {
         let idx = (rand.next_int() % data.len() as u128) as usize;
         data.flip_bit(idx);
+        data
     }
 
     /// This function is restricted to flipping at most one bit per byte. It will
     /// only flip 2 bits in a byte if only one byte is provided.
     ///
     /// The chance is per bit pair. A chance of 0 ensures that the data is unchanged.
-    fn multi_bit_flip_even(rand: &mut XorShift, chance: u8, data: &mut BitString) {
+    fn multi_bit_flip_even(rand: &mut XorShift, chance: u8, mut data: BitString) -> BitString {
         assert!(chance <= 100);
 
         if chance == 0 {
-            return;
+            return data;
         }
 
-        let count_ones_before = data.into_iter().filter(|bit| **bit == Bit::On).count();
+        let count_ones_before = (&data).into_iter().filter(|bit| **bit == Bit::On).count();
 
-        for bit in &mut *data {
+        for bit in &mut data {
             let event = (rand.next_int() % 100) as u8;
 
             if event > chance {
@@ -70,39 +70,44 @@ impl Corruption {
             bit.flip();
         }
 
-        let count_ones_after = data.into_iter().filter(|bit| **bit == Bit::On).count();
+        let count_ones_after = (&data).into_iter().filter(|bit| **bit == Bit::On).count();
 
         // If the number of ones before and after differ by a value divisible by 2,
         // we have an even amount of flips. Otherwise we flip again.
         if count_ones_before.abs_diff(count_ones_after) % 2 != 0 {
-            Self::one_bit_flip(rand, data);
+            Self::one_bit_flip(rand, data)
+        } else {
+            data
         }
     }
 
     /// This function is restricted to flipping at most one bit per byte.
-    fn multi_bit_flip_odd(rand: &mut XorShift, chance: u8, data: &mut BitString) {
+    fn multi_bit_flip_odd(rand: &mut XorShift, chance: u8, data: BitString) -> BitString {
         assert!(chance <= 100);
 
         if chance == 0 {
-            return;
+            return data;
         }
 
         // Corrupt the data an even amount of times, then once more
-        Self::multi_bit_flip_even(rand, chance, data);
+        let data = Self::multi_bit_flip_even(rand, chance, data);
         Self::one_bit_flip(rand, data)
     }
 
     /// Flips 8 bits in order in the bitstring
-    fn burst_flip(rand: &mut XorShift, data: &mut BitString) {
-        assert!(data.len() >= 8);
-
-        let len = 8;
-        let idx = (rand.next_int() % (data.len() - 7) as u128) as usize;
+    fn burst_flip(rand: &mut XorShift, mut data: BitString) -> BitString {
+        let len = rand.next_int_bound(
+            usize::min(data.len() / 2, 4) as u128,
+            usize::min(data.len() / 2, 16) as u128,
+        ) as usize;
+        let idx = (rand.next_int() % (data.len() - len) as u128) as usize;
 
         data.flip_bits(idx, len);
+
+        data
     }
 
-    fn random(rand: &mut XorShift, data: &mut BitString) {
+    fn random(rand: &mut XorShift, data: BitString) -> BitString {
         let mut rand = rand.copy_reset();
 
         // between 0 and 100, we exclude 101
@@ -160,10 +165,10 @@ mod test {
 
     #[test]
     fn test_no_flip() {
-        let mut data = get_data_default();
+        let data = get_data_default();
         let data_copy = data.clone();
 
-        Corruption::no_corruption(&mut data);
+        let data = Corruption::no_corruption(data);
 
         assert_eq!(bits_flipped(&data, &data_copy), 0);
     }
@@ -171,10 +176,10 @@ mod test {
     #[test]
     fn test_bit_flip() {
         let mut rand = XorShift::new(69);
-        let mut data = get_data_default();
+        let data = get_data_default();
         let data_copy = data.clone();
 
-        Corruption::one_bit_flip(&mut rand, &mut data);
+        let data = Corruption::one_bit_flip(&mut rand, data);
 
         assert!(bits_flipped(&data, &data_copy) == 1);
     }
@@ -182,10 +187,10 @@ mod test {
     #[test]
     fn test_mutli_bit_flip_even_byte() {
         let mut rand = XorShift::new(69);
-        let mut data = get_data_default();
+        let data = get_data_default();
         let data_copy = data.clone();
 
-        Corruption::multi_bit_flip_even(&mut rand, 100, &mut data);
+        let data = Corruption::multi_bit_flip_even(&mut rand, 100, data);
 
         assert_eq!(bits_flipped(&data, &data_copy) % 2, 0);
     }
@@ -193,10 +198,10 @@ mod test {
     #[test]
     fn test_mutli_bit_flip_odd_byte() {
         let mut rand = XorShift::new(69);
-        let mut data = get_data_default();
+        let data = get_data_default();
         let data_copy = data.clone();
 
-        Corruption::multi_bit_flip_odd(&mut rand, 100, &mut data);
+        let data = Corruption::multi_bit_flip_odd(&mut rand, 100, data);
 
         assert_ne!(bits_flipped(&data, &data_copy) % 2, 0);
     }
@@ -204,12 +209,13 @@ mod test {
     #[test]
     fn test_burst_flip() {
         let mut rand = XorShift::new(69);
-        let mut data = get_data_default();
+        let data = get_data_default();
         let data_copy = data.clone();
 
-        Corruption::burst_flip(&mut rand, &mut data);
+        let data = Corruption::burst_flip(&mut rand, data);
 
-        assert_eq!(bits_flipped(&data, &data_copy), 8);
+        assert!(bits_flipped(&data, &data_copy) >= 4);
+        assert!(bits_flipped(&data, &data_copy) <= 8);
     }
 
     #[test]
@@ -220,9 +226,10 @@ mod test {
 
         let data_copy = data.clone();
 
-        Corruption::burst_flip(&mut rand, &mut data);
+        let data = Corruption::burst_flip(&mut rand, data);
 
-        assert_eq!(bits_flipped(&data, &data_copy), 8);
+        assert!(bits_flipped(&data, &data_copy) >= 4);
+        assert!(bits_flipped(&data, &data_copy) <= 8);
     }
 
     // --- Make sure the panics work as intended ---
@@ -233,16 +240,13 @@ mod test {
     #[test]
     #[should_panic]
     fn none_assert_panics() {
-        Corruption::corrupt(Corruption::None, &mut get_data_empty());
+        Corruption::corrupt(Corruption::None, get_data_empty());
     }
 
     #[test]
     #[should_panic]
     fn one_bit_flip_assert_panics() {
-        Corruption::corrupt(
-            Corruption::OneBitFlip(XorShift::new(0)),
-            &mut get_data_empty(),
-        );
+        Corruption::corrupt(Corruption::OneBitFlip(XorShift::new(0)), get_data_empty());
     }
 
     #[test]
@@ -250,7 +254,7 @@ mod test {
     fn multi_bit_flip_even_assert_panics_on_no_data() {
         Corruption::corrupt(
             Corruption::MultiBitFlipEven(XorShift::new(0), 69),
-            &mut get_data_empty(),
+            get_data_empty(),
         );
     }
 
@@ -259,7 +263,7 @@ mod test {
     fn multi_bit_flip_even_assert_panics_on_impossible_chance() {
         Corruption::corrupt(
             Corruption::MultiBitFlipEven(XorShift::new(0), 128),
-            &mut get_data_default(),
+            get_data_default(),
         );
     }
 
@@ -268,7 +272,7 @@ mod test {
     fn multi_bit_flip_odd_assert_panics_on_no_data() {
         Corruption::corrupt(
             Corruption::MultiBitFlipOdd(XorShift::new(0), 69),
-            &mut get_data_empty(),
+            get_data_empty(),
         );
     }
 
@@ -277,32 +281,29 @@ mod test {
     fn multi_bit_flip_odd_assert_panics_on_impossible_chance() {
         Corruption::corrupt(
             Corruption::MultiBitFlipOdd(XorShift::new(0), 128),
-            &mut get_data_default(),
+            get_data_default(),
         );
     }
 
     #[test]
     #[should_panic]
     fn burst_flip_assert_panic() {
-        Corruption::corrupt(
-            Corruption::BurstFlip(XorShift::new(0)),
-            &mut get_data_empty(),
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn burst_flip_too_small() {
-        let mut data = BitString::new();
-        data.append_bit(Bit::On);
-
-        Corruption::corrupt(Corruption::BurstFlip(XorShift::new(0)), &mut data);
+        Corruption::corrupt(Corruption::BurstFlip(XorShift::new(0)), get_data_empty());
     }
 
     #[test]
     #[should_panic]
     fn assert_random_panics_on_no_data() {
-        Corruption::corrupt(Corruption::Random(XorShift::new(0)), &mut get_data_empty());
+        Corruption::corrupt(Corruption::Random(XorShift::new(0)), get_data_empty());
+    }
+
+    #[test]
+    #[should_panic]
+    fn assert_random_corrupt_panics_on_no_data() {
+        Corruption::corrupt(
+            Corruption::RandomCorruption(XorShift::new(0)),
+            get_data_empty(),
+        );
     }
 
     #[test]
