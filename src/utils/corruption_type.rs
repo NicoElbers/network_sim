@@ -8,6 +8,7 @@ const ENUM_VARIANTS: usize = 6;
 pub enum Corruption {
     None,
     Random(XorShift),
+    RandomCorruption(XorShift),
     OneBitFlip(XorShift),
     MultiBitFlipOdd(XorShift, u8),
     MultiBitFlipEven(XorShift, u8),
@@ -34,6 +35,7 @@ impl Corruption {
             }
             Self::BurstFlip(ref mut rand) => Self::burst_flip(rand, data),
             Self::Random(rand) => Self::random(rand, data),
+            Self::RandomCorruption(rand) => Self::random_corruption(rand, data),
         }
     }
 
@@ -122,6 +124,24 @@ impl Corruption {
             2 => Self::corrupt(Self::MultiBitFlipOdd(rand, chance), data),
             3 => Self::corrupt(Self::MultiBitFlipEven(rand, chance), data),
             4 => Self::corrupt(Self::BurstFlip(rand), data),
+            _ => unreachable!(),
+        }
+    }
+
+    fn random_corruption(rand: &mut XorShift, data: BitString) -> BitString {
+        let mut rand = rand.copy_reset();
+
+        // between 0 and 100, we exclude 101
+        let chance = (rand.next_int() % 101) as u8;
+
+        // Random is a variant we ignore, so -1
+        let idx = rand.next_int() % (ENUM_VARIANTS - 2) as u128;
+
+        match idx {
+            0 => Self::corrupt(Self::OneBitFlip(rand), data),
+            1 => Self::corrupt(Self::MultiBitFlipOdd(rand, chance), data),
+            2 => Self::corrupt(Self::MultiBitFlipEven(rand, chance), data),
+            3 => Self::corrupt(Self::BurstFlip(rand), data),
             _ => unreachable!(),
         }
     }
@@ -311,8 +331,10 @@ mod test {
         let mut seed_gen = XorShift::new(0);
 
         for _ in 0..RANDOM_TEST_CYCLES {
-            let rand = XorShift::new(seed_gen.next_int());
-            Corruption::corrupt(Corruption::Random(rand), &mut get_data_default());
+            let rand1 = XorShift::new(seed_gen.next_int());
+            let rand2 = XorShift::new(seed_gen.next_int());
+            Corruption::corrupt(Corruption::Random(rand1), get_data_default());
+            Corruption::corrupt(Corruption::RandomCorruption(rand2), get_data_default());
         }
     }
 }
