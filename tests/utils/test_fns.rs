@@ -1,4 +1,4 @@
-use std::{rc::Rc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use network_sim::{
     bit::Bit,
@@ -30,27 +30,21 @@ pub fn create_cable(
     latency: Duration,
     corruption_type: Corruption,
     throughput_ms: u32,
-) -> (Cable, Rc<TestUser>, Rc<TestUser>) {
+) -> (Cable, Arc<TestUser>, Arc<TestUser>) {
     let mut mac_gen = MacAddressGenerator::new(6969);
 
     let node1 = TestUser::new(&mut mac_gen);
     let node2 = TestUser::new(&mut mac_gen);
 
-    let node1 = Rc::new(node1);
-    let node2 = Rc::new(node2);
+    let node1 = Arc::new(node1);
+    let node2 = Arc::new(node2);
 
-    let cable = Cable::new(
-        node1.clone(),
-        node2.clone(),
-        latency,
-        corruption_type,
-        throughput_ms,
-    );
+    let cable = Cable::new(&node1, &node2, latency, corruption_type, throughput_ms);
 
     (cable, node1, node2)
 }
 
-pub fn equals_bit_vec_and_byte_slice(vec: Vec<CableContext>, slice: &[u8]) -> bool {
+pub fn equals_bit_vec_and_byte_slice(vec: &[CableContext], slice: &[u8]) -> bool {
     let recv_bs: BitString = vec.iter().map(|cc| cc.bit).collect::<Vec<Bit>>().into();
     let test_msg_bs: BitString = slice.into();
 

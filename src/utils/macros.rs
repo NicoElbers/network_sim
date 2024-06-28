@@ -32,11 +32,13 @@ macro_rules! append_type {
     ($t:ty) => {
         ::paste::paste! {
             pub fn [<append_ $t>](&mut self, data: $t) {
-                    let bit_size = <$t>::BITS as usize;
+                let bit_size = <$t>::BITS as usize;
 
-                    let mask: $t = 0b1 << (bit_size - 1);
+                self.bit_vec.reserve(bit_size);
 
-                    for idx in 0..bit_size {
+                let mask: $t = 0b1 << (bit_size - 1);
+
+                for idx in 0..bit_size {
                     let mask = mask >> idx;
 
                     let masked = data & mask;
@@ -78,6 +80,7 @@ macro_rules! insert_type {
 macro_rules! get_type {
     ($t:ty) => {
         ::paste::paste! {
+            #[must_use]
             pub fn [<get_ $t>](&self, index: usize) -> $t {
                 let bit_size = <$t>::BITS as usize;
 
@@ -129,7 +132,7 @@ macro_rules! set_type {
                     .rev()
                     .enumerate()
                     .for_each(|(idx, bit)| {
-                        let (shifted_data, _) = data.overflowing_shr(idx as u32);
+                        let (shifted_data, _) = data.overflowing_shr(u32::try_from(idx).expect("Bit size cannot be bigger than u32::MAX"));
 
                         *bit = Bit::try_from(shifted_data & mask)
                             .expect("This is ensured to work because we mask with 0b1");
@@ -261,6 +264,7 @@ macro_rules! bit_string_as_vec {
                 Ok(self.[<as_vec_with_padding_ $t>]())
             }
 
+            #[must_use]
             pub fn [<as_vec_exact_ $t>](&self) -> Vec<$t> {
                 assert!(self.len() % <$t>::BITS as usize == 0,
                     "The bitstring is not a multiple of bit size, and can thus not be neatly made into bytes. Consider adding {} bits of padding",
@@ -270,6 +274,7 @@ macro_rules! bit_string_as_vec {
                 self.[<as_vec_with_padding_ $t>]()
             }
 
+            #[must_use]
             pub fn [<as_vec_with_padding_ $t>](&self) -> Vec<$t> {
                 let chunk_iter = self.bit_vec.chunks_exact(<$t>::BITS as usize);
                 let mut byte_vec: Vec<$t> = Vec::new();

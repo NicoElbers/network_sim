@@ -32,7 +32,8 @@ impl<B, F: Frame<B>> Default for DataLinkLayer<B, F> {
 }
 
 impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             frame_type: PhantomData::<TCPFrame>,
             builder_type: PhantomData::<TCPFrameBuilder>,
@@ -44,7 +45,7 @@ impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
         source_mac: MacAddress,
         source_port: u16,
         target_port: u16,
-        cable: Arc<Mutex<Cable>>,
+        cable: &Arc<Mutex<Cable>>,
         data: BitString,
     ) -> anyhow::Result<()> {
         let tcp_builder = TCPFrameBuilder::new()
@@ -60,7 +61,7 @@ impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
             source_port,
             target_port,
             cable,
-            data,
+            &data,
         )
     }
 
@@ -69,8 +70,8 @@ impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
         source_mac: MacAddress,
         source_port: u16,
         target_port: u16,
-        cable: Arc<Mutex<Cable>>,
-        data: Vec<TCPFrame>,
+        cable: &Arc<Mutex<Cable>>,
+        data: &[TCPFrame],
     ) -> anyhow::Result<()> {
         let windows = data.windows(window_size.into());
 
@@ -81,7 +82,7 @@ impl DataLinkLayer<TCPFrameBuilder, TCPFrame> {
             cable
                 .lock()
                 .expect("The cable should never panic")
-                .send_bits(source_mac, source_port, target_port, data)?
+                .send_bits(source_mac, source_port, target_port, data)?;
         }
 
         Ok(())

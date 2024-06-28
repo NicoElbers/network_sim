@@ -26,6 +26,7 @@ impl XorShift {
     /// Creates a new [`XorShift`] seed. This is stored in a u128, so it'll be
     /// fine for a while. Important THIS IS NOT CRYPTOGRAPHICALLY SECURE, THIS
     /// JUST WORKS.
+    #[must_use]
     pub const fn new(seed: u128) -> Self {
         Self { state: seed }
     }
@@ -66,9 +67,10 @@ impl XorShift {
         let diff = max - min;
         let next = self.next_01();
 
-        min + diff * next
+        diff.mul_add(next, min)
     }
 
+    #[must_use]
     pub fn copy_reset(&mut self) -> Self {
         let self_state = self.state;
         let mut reset_state = self_state ^ self.next_int();

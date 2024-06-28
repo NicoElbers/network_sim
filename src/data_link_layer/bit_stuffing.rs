@@ -62,22 +62,9 @@ fn surround_flags(mut data: BitString) -> BitString {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        bit_string::BitString, bitstring, data_link_layer::bit_stuffing::FLAG_SEQUECE,
-        rand::XorShift,
-    };
+    use crate::{bit_string::BitString, bitstring, data_link_layer::bit_stuffing::FLAG_SEQUECE};
 
     use super::{stuff_bits, surround_flags, unstuff_bits};
-
-    fn generate_random_data<const N: usize>(seed: u128) -> [u8; N] {
-        let mut rand = XorShift::new(seed);
-        let mut data: [u8; N] = [0; N];
-
-        data.iter_mut()
-            .for_each(|el| *el = (rand.next_int() & u8::MAX as u128) as u8);
-
-        data
-    }
 
     #[test]
     fn surround_flags_test() {
@@ -106,25 +93,37 @@ mod test {
         let bs = stuff_bits(bs);
         let expected = bitstring![0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0,];
 
-        println!("{:?}", bs);
         assert_eq!(expected, bs);
     }
 
-    #[test]
-    fn stuffing_fuzz() {
-        for seed in 0..=1024 {
-            let bs = BitString::from(generate_random_data::<125>(seed));
-            let bs_clone = bs.clone();
+    #[cfg(feature = "fuzz")]
+    mod fuzz {
+        use crate::data_link_layer::bit_stuffing::stuff_bits;
+        use crate::data_link_layer::bit_stuffing::unstuff_bits;
 
-            let stuffed = stuff_bits(bs);
-            let unstuffed = unstuff_bits(stuffed.clone());
+        use crate::{bit_string::BitString, rand::XorShift};
+        fn generate_random_data<const N: usize>(seed: u128) -> [u8; N] {
+            let mut rand = XorShift::new(seed);
+            let mut data: [u8; N] = [0; N];
 
-            // println!("---");
-            // println!("{bs_clone}");
-            // println!("{stuffed}");
-            // println!("{unstuffed}");
+            #[allow(clippy::cast_possible_truncation)]
+            data.iter_mut()
+                .for_each(|el| *el = (rand.next_int() & u8::MAX as u128) as u8);
 
-            assert_eq!(bs_clone, unstuffed, "Failed with seed {}", seed);
+            data
+        }
+
+        #[test]
+        fn stuffing_fuzz() {
+            for seed in 0..=1024 {
+                let bs = BitString::from(generate_random_data::<125>(seed));
+                let bs_clone = bs.clone();
+
+                let stuffed = stuff_bits(bs);
+                let unstuffed = unstuff_bits(stuffed.clone());
+
+                assert_eq!(bs_clone, unstuffed, "Failed with seed {seed}");
+            }
         }
     }
 }

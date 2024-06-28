@@ -12,7 +12,7 @@ use network_sim::physical_layer::cable::CableContext;
 use network_sim::rand::XorShift;
 use network_sim::{corruption_type::Corruption, hardware::Node};
 
-const ASCII_TEST_MSG: &[u8] = "Hello world!".as_bytes();
+const ASCII_TEST_MSG: &[u8] = b"Hello world!";
 
 #[test]
 fn send_data_clean() -> anyhow::Result<()> {
@@ -32,7 +32,7 @@ fn send_data_clean() -> anyhow::Result<()> {
     let recv_data = node2_receiver.try_iter().collect::<Vec<CableContext>>();
 
     // Pending hello world
-    assert!(equals_bit_vec_and_byte_slice(recv_data, ASCII_TEST_MSG));
+    assert!(equals_bit_vec_and_byte_slice(&recv_data, ASCII_TEST_MSG));
 
     Ok(())
 }
@@ -113,7 +113,7 @@ fn correct_throughput() -> anyhow::Result<()> {
             .is_ok());
     }
 
-    assert!(start.elapsed() >= time_per_byte * data.len().try_into().unwrap());
+    assert!(start.elapsed() >= time_per_byte * data.len().try_into().expect(""));
 
     Ok(())
 }

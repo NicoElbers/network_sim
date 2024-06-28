@@ -10,7 +10,7 @@ use network_sim::{
 };
 
 #[derive(Debug)]
-pub(crate) struct TestUser {
+pub struct TestUser {
     mac: MacAddress,
     connections: Vec<Arc<Cable>>,
     receiver: Receiver<CableContext>,
@@ -25,19 +25,17 @@ impl TestUser {
         let sender = Arc::new(tx);
         let receiver = rx;
 
-        let usr = Self {
+        Self {
             mac,
             connections: Vec::new(),
-            sender: sender.clone(),
+            sender,
             receiver,
-        };
-
-        usr
+        }
     }
 }
 
 impl TestUser {
-    pub fn get_receiver(&self) -> &Receiver<CableContext> {
+    pub const fn get_receiver(&self) -> &Receiver<CableContext> {
         &self.receiver
     }
 }
@@ -47,7 +45,7 @@ impl Node for TestUser {
         if self.connections.contains(&cable) {
             return;
         }
-        self.connections.push(cable.clone());
+        self.connections.push(cable);
     }
 
     fn get_transmitter(&self) -> Arc<Sender<CableContext>> {

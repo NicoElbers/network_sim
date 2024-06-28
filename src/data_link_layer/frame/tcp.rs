@@ -38,7 +38,7 @@ pub struct TCPFrameBuilder {
 }
 
 impl TCPFrameBuilder {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             source_port: None,
             target_port: None,
@@ -67,7 +67,9 @@ impl TCPFrameBuilder {
 
         for (idx, data) in data_points.iter().enumerate() {
             let data = data.clone();
-            self.sequence_num = idx as u32;
+            self.sequence_num = u32::try_from(idx).unwrap_or_else(|_| {
+                panic!("Trying to send too many data points, {} allowed", u32::MAX)
+            });
             res_vec.push(self.build(data));
         }
 
@@ -75,14 +77,15 @@ impl TCPFrameBuilder {
     }
 
     fn build(&self, data: BitString) -> TCPFrame {
-        assert!(self.source_port.is_some());
-        assert!(self.target_port.is_some());
-        assert!(self.window_size.is_some());
-
-        // All these values have been asserted to be present
-        let source_port = self.source_port.unwrap();
-        let target_port = self.target_port.unwrap();
-        let window_size = self.window_size.unwrap();
+        let source_port = self
+            .source_port
+            .expect("Cannot construct a TCPFrame without source port");
+        let target_port = self
+            .target_port
+            .expect("Cannot construct a TCPFrame without target port");
+        let window_size = self
+            .window_size
+            .expect("Cannot construct a TCPFarme without window size");
 
         let sequence_num = self.sequence_num;
         let ack_num = self.ack_num;
@@ -125,13 +128,13 @@ impl TCPFrameBuilder {
 
         // -- Find checksum --
         let vec = output_bitstring.as_vec_exact_u16();
-        let mut sum: u32 = vec.iter().map(|&x| x as u32).sum();
+        let mut sum: u32 = vec.iter().map(|&x| u32::from(x)).sum();
 
         while sum > 0xFFFF {
             sum = (sum >> 16) + (sum & 0xFFFF);
         }
 
-        let checksum: u16 = !(sum as u16);
+        let checksum: u16 = !(u16::try_from(sum).expect("Error in calculating checksum"));
 
         output_bitstring.set_u16(128, checksum);
 
@@ -153,14 +156,14 @@ impl TCPFrameBuilder {
         }
     }
 
-    pub fn set_source_port(self, source_port: u16) -> Self {
+    pub const fn set_source_port(self, source_port: u16) -> Self {
         Self {
             source_port: Some(source_port),
             ..self
         }
     }
 
-    pub fn set_target_port(self, target_port: u16) -> Self {
+    pub const fn set_target_port(self, target_port: u16) -> Self {
         Self {
             target_port: Some(target_port),
             ..self
@@ -174,7 +177,7 @@ impl TCPFrameBuilder {
     //     }
     // }
 
-    pub fn set_ack_num(self, ack_num: u32) -> Self {
+    pub const fn set_ack_num(self, ack_num: u32) -> Self {
         Self { ack_num, ..self }
     }
 
@@ -186,7 +189,7 @@ impl TCPFrameBuilder {
         }
     }
 
-    pub fn set_flags(self, flag: u8) -> Self {
+    pub const fn set_flags(self, flag: u8) -> Self {
         let mut flag_byte = self.flag_byte;
 
         flag_byte |= flag;
@@ -194,21 +197,21 @@ impl TCPFrameBuilder {
         Self { flag_byte, ..self }
     }
 
-    pub fn set_window_size(self, window_size: u16) -> Self {
+    pub const fn set_window_size(self, window_size: u16) -> Self {
         Self {
             window_size: Some(window_size),
             ..self
         }
     }
 
-    pub fn set_urgent_pointer(self, urgent_pointer: u16) -> Self {
+    pub const fn set_urgent_pointer(self, urgent_pointer: u16) -> Self {
         Self {
             urgent_pointer,
             ..self
         }
     }
 
-    pub fn set_options(self, options: [u32; 10]) -> Self {
+    pub const fn set_options(self, options: [u32; 10]) -> Self {
         Self { options, ..self }
     }
 }
@@ -285,8 +288,8 @@ mod test {
     const CHECKSUM2: u16 = 0b0010_1101_1100_0010;
 
     // Datapoints
-    const DATA: [u128; 2] = [0b10110010101110100100101001011011011010010010100101101011101010101001010100101010110111010101010010101001010101110101010010101010u128,
-                             0b10011010100101110100100101010010101010110101001010100101111101010101001010101001010100101011001010101101010110010011001100001101u128];
+    const DATA: [u128; 2] = [0b1011_0010_1011_1010_0100_1010_0101_1011_0110_1001_0010_1001_0110_1011_1010_1010_1001_0101_0010_1010_1101_1101_0101_0100_1010_1001_0101_0111_0101_0100_1010_1010_u128,
+                             0b1001_1010_1001_0111_0100_1001_0101_0010_1010_1011_0101_0010_1010_0101_1111_0101_0101_0010_1010_1001_0101_0010_1011_0010_1010_1101_0101_1001_0011_0011_0000_1101_u128];
 
     fn headers() -> Vec<TCPFrame> {
         let data_points = [BitString::new(), BitString::new()];
@@ -318,67 +321,66 @@ mod test {
         builder.build_all(data_points)
     }
 
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn basic_header() {
         let headers = headers();
 
         assert_eq!(headers.len(), 2);
 
-        let header1 = &headers[0];
-        assert_eq!(header1.source_port, SOURCE_PORT, "Failed at source_port");
-        assert_eq!(header1.target_port, TARGET_PORT, "Failed at target_port");
+        let first = &headers[0];
+        assert_eq!(first.source_port, SOURCE_PORT, "Failed at source_port");
+        assert_eq!(first.target_port, TARGET_PORT, "Failed at target_port");
+        assert_eq!(first.sequence_num, SEQUENCE_NUM1, "Failed at sequence_num1");
+        assert_eq!(first.ack_num, ACK_NUM, "Failed at ack_num");
+        assert_eq!(first.data_offset, DATA_OFFSET, "Failed at data_offset");
+        assert_eq!(first.flag_byte, FLAG, "Failed at flag");
+        assert_eq!(first.window_size, WINDOW_SIZE, "Failed at window_size");
+        assert_eq!(first.checksum, CHECKSUM1, "Failed at checksum1");
         assert_eq!(
-            header1.sequence_num, SEQUENCE_NUM1,
-            "Failed at sequence_num1"
-        );
-        assert_eq!(header1.ack_num, ACK_NUM, "Failed at ack_num");
-        assert_eq!(header1.data_offset, DATA_OFFSET, "Failed at data_offset");
-        assert_eq!(header1.flag_byte, FLAG, "Failed at flag");
-        assert_eq!(header1.window_size, WINDOW_SIZE, "Failed at window_size");
-        assert_eq!(header1.checksum, CHECKSUM1, "Failed at checksum1");
-        assert_eq!(
-            header1.urgent_pointer, URGENT_POINTER,
+            first.urgent_pointer, URGENT_POINTER,
             "Failed at urgent_pointer"
         );
-        assert_eq!(header1.options[0], OPTIONS[0], "Failed at options[0]");
-        assert_eq!(header1.options[1], OPTIONS[1], "Failed at options[1]");
-        assert_eq!(header1.options[2], OPTIONS[2], "Failed at options[2]");
-        assert_eq!(header1.options[3], OPTIONS[3], "Failed at options[3]");
-        assert_eq!(header1.options[4], OPTIONS[4], "Failed at options[4]");
-        assert_eq!(header1.options[5], OPTIONS[5], "Failed at options[5]");
-        assert_eq!(header1.options[6], OPTIONS[6], "Failed at options[6]");
-        assert_eq!(header1.options[7], OPTIONS[7], "Failed at options[7]");
-        assert_eq!(header1.options[8], OPTIONS[8], "Failed at options[8]");
-        assert_eq!(header1.options[9], OPTIONS[9], "Failed at options[9]");
+        assert_eq!(first.options[0], OPTIONS[0], "Failed at options[0]");
+        assert_eq!(first.options[1], OPTIONS[1], "Failed at options[1]");
+        assert_eq!(first.options[2], OPTIONS[2], "Failed at options[2]");
+        assert_eq!(first.options[3], OPTIONS[3], "Failed at options[3]");
+        assert_eq!(first.options[4], OPTIONS[4], "Failed at options[4]");
+        assert_eq!(first.options[5], OPTIONS[5], "Failed at options[5]");
+        assert_eq!(first.options[6], OPTIONS[6], "Failed at options[6]");
+        assert_eq!(first.options[7], OPTIONS[7], "Failed at options[7]");
+        assert_eq!(first.options[8], OPTIONS[8], "Failed at options[8]");
+        assert_eq!(first.options[9], OPTIONS[9], "Failed at options[9]");
 
-        let header2 = &headers[1];
-        assert_eq!(header2.source_port, SOURCE_PORT, "Failed at source_port");
-        assert_eq!(header2.target_port, TARGET_PORT, "Failed at target_port");
+        let second = &headers[1];
+        assert_eq!(second.source_port, SOURCE_PORT, "Failed at source_port");
+        assert_eq!(second.target_port, TARGET_PORT, "Failed at target_port");
         assert_eq!(
-            header2.sequence_num, SEQUENCE_NUM2,
+            second.sequence_num, SEQUENCE_NUM2,
             "Failed at sequence_num2"
         );
-        assert_eq!(header2.ack_num, ACK_NUM, "Failed at ack_num");
-        assert_eq!(header2.data_offset, DATA_OFFSET, "Failed at data_offset");
-        assert_eq!(header2.flag_byte, FLAG, "Failed at flag");
-        assert_eq!(header2.window_size, WINDOW_SIZE, "Failed at window_size");
-        assert_eq!(header2.checksum, CHECKSUM2, "Failed at checksum2");
+        assert_eq!(second.ack_num, ACK_NUM, "Failed at ack_num");
+        assert_eq!(second.data_offset, DATA_OFFSET, "Failed at data_offset");
+        assert_eq!(second.flag_byte, FLAG, "Failed at flag");
+        assert_eq!(second.window_size, WINDOW_SIZE, "Failed at window_size");
+        assert_eq!(second.checksum, CHECKSUM2, "Failed at checksum2");
         assert_eq!(
-            header2.urgent_pointer, URGENT_POINTER,
+            second.urgent_pointer, URGENT_POINTER,
             "Failed at urgent_pointer"
         );
-        assert_eq!(header2.options[0], OPTIONS[0], "Failed at options[0]");
-        assert_eq!(header2.options[1], OPTIONS[1], "Failed at options[1]");
-        assert_eq!(header2.options[2], OPTIONS[2], "Failed at options[2]");
-        assert_eq!(header2.options[3], OPTIONS[3], "Failed at options[3]");
-        assert_eq!(header2.options[4], OPTIONS[4], "Failed at options[4]");
-        assert_eq!(header2.options[5], OPTIONS[5], "Failed at options[5]");
-        assert_eq!(header2.options[6], OPTIONS[6], "Failed at options[6]");
-        assert_eq!(header2.options[7], OPTIONS[7], "Failed at options[7]");
-        assert_eq!(header2.options[8], OPTIONS[8], "Failed at options[8]");
-        assert_eq!(header2.options[9], OPTIONS[9], "Failed at options[9]");
+        assert_eq!(second.options[0], OPTIONS[0], "Failed at options[0]");
+        assert_eq!(second.options[1], OPTIONS[1], "Failed at options[1]");
+        assert_eq!(second.options[2], OPTIONS[2], "Failed at options[2]");
+        assert_eq!(second.options[3], OPTIONS[3], "Failed at options[3]");
+        assert_eq!(second.options[4], OPTIONS[4], "Failed at options[4]");
+        assert_eq!(second.options[5], OPTIONS[5], "Failed at options[5]");
+        assert_eq!(second.options[6], OPTIONS[6], "Failed at options[6]");
+        assert_eq!(second.options[7], OPTIONS[7], "Failed at options[7]");
+        assert_eq!(second.options[8], OPTIONS[8], "Failed at options[8]");
+        assert_eq!(second.options[9], OPTIONS[9], "Failed at options[9]");
     }
 
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn basic_header_from_bitstring() {
         let headers = headers();
@@ -386,7 +388,7 @@ mod test {
         assert_eq!(headers.len(), 2);
 
         let header1_bs = &headers[0].output_bitstring;
-        let header1 = &headers[0];
+        let first = &headers[0];
 
         assert_eq!(header1_bs.get_u16(0), SOURCE_PORT, "Failed at source_port");
         assert_eq!(header1_bs.get_u16(16), TARGET_PORT, "Failed at target_port");
@@ -409,7 +411,7 @@ mod test {
         );
         assert_eq!(
             BitString::from(header1_bs.get_u16(128)),
-            BitString::from(header1.checksum),
+            BitString::from(first.checksum),
             "Failed at checksum1"
         );
         assert_eq!(
@@ -429,7 +431,7 @@ mod test {
         assert_eq!(header1_bs.get_u32(448), OPTIONS[9], "Failed at options[9]");
 
         let header2_bs = &headers[1].output_bitstring;
-        let header2 = &headers[1];
+        let second = &headers[1];
         assert_eq!(header2_bs.get_u16(0), SOURCE_PORT, "Failed at source_port");
         assert_eq!(header2_bs.get_u16(16), TARGET_PORT, "Failed at target_port");
         assert_eq!(
@@ -451,7 +453,7 @@ mod test {
         );
         assert_eq!(
             BitString::from(header2_bs.get_u16(128)),
-            BitString::from(header2.checksum),
+            BitString::from(second.checksum),
             "Failed at checksum2"
         );
         assert_eq!(
@@ -472,6 +474,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn too_large_data_offset() {
         TCPFrameBuilder::new().set_data_offset(0b0001_0000u8); // 16
@@ -488,9 +491,6 @@ mod test {
         let window_size = 0b0000_0000_0000_0000u16;
         let urgent_pointer = 0b0000_0000_0000_0000u16;
         let options = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-        // Assumed
-        let _sequence_num1 = 0b0000_0000_0000_0000_0000_0000_0000_0000u32;
 
         // Hand calculated
         let checksum = 0b1111_1111_1111_1111;
@@ -512,7 +512,6 @@ mod test {
         let header_bs = headers[0].output_bitstring.clone();
         let header = &headers[0];
 
-        println!("{header_bs}");
         assert_eq!(header_bs.get_u16(128 - 16), 0);
         assert_eq!(header_bs.get_u16(128), checksum);
         assert_eq!(header_bs.get_u16(128 + 16), 0);

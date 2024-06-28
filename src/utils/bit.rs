@@ -16,23 +16,24 @@ pub enum Bit {
 impl Bit {
     pub const BITS: u32 = 1;
 
-    pub fn stringify(&self) -> &str {
+    #[must_use]
+    pub const fn stringify(&self) -> &str {
         match self {
-            Bit::Off => "0",
-            Bit::On => "1",
+            Self::Off => "0",
+            Self::On => "1",
         }
     }
 
     pub fn flip(&mut self) {
-        *self ^= Bit::On
+        *self ^= Self::On;
     }
 }
 
 impl Display for Bit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Bit::On => write!(f, "1"),
-            Bit::Off => write!(f, "0"),
+            Self::On => write!(f, "1"),
+            Self::Off => write!(f, "0"),
         }
     }
 }
@@ -41,11 +42,12 @@ impl BitXor for Bit {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match (self, rhs) {
-            (Bit::Off, Bit::Off) => Bit::Off,
-            (Bit::Off, Bit::On) => Bit::On,
-            (Bit::On, Bit::Off) => Bit::On,
-            (Bit::On, Bit::On) => Bit::Off,
+            (Self::Off, Self::Off) => Self::Off,
+            (Self::Off, Self::On) => Self::On,
+            (Self::On, Self::Off) => Self::On,
+            (Self::On, Self::On) => Self::Off,
         }
     }
 }
@@ -54,6 +56,7 @@ impl BitXor for &Bit {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match (self, rhs) {
             (Bit::Off, Bit::Off) => &Bit::Off,
             (Bit::Off, Bit::On) => &Bit::On,
@@ -79,11 +82,12 @@ impl BitAnd for Bit {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match (self, rhs) {
-            (Bit::Off, Bit::Off) => Bit::Off,
-            (Bit::Off, Bit::On) => Bit::Off,
-            (Bit::On, Bit::Off) => Bit::Off,
-            (Bit::On, Bit::On) => Bit::On,
+            (Self::Off, Self::Off) => Self::Off,
+            (Self::Off, Self::On) => Self::Off,
+            (Self::On, Self::Off) => Self::Off,
+            (Self::On, Self::On) => Self::On,
         }
     }
 }
@@ -92,6 +96,7 @@ impl BitAnd for &Bit {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match (self, rhs) {
             (Bit::Off, Bit::Off) => &Bit::Off,
             (Bit::Off, Bit::On) => &Bit::Off,
@@ -117,11 +122,12 @@ impl BitOr for Bit {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match (self, rhs) {
-            (Bit::Off, Bit::Off) => Bit::Off,
-            (Bit::Off, Bit::On) => Bit::On,
-            (Bit::On, Bit::Off) => Bit::On,
-            (Bit::On, Bit::On) => Bit::On,
+            (Self::Off, Self::Off) => Self::Off,
+            (Self::Off, Self::On) => Self::On,
+            (Self::On, Self::Off) => Self::On,
+            (Self::On, Self::On) => Self::On,
         }
     }
 }
@@ -130,6 +136,7 @@ impl BitOr for &Bit {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match (self, rhs) {
             (Bit::Off, Bit::Off) => &Bit::Off,
             (Bit::Off, Bit::On) => &Bit::On,
@@ -155,9 +162,10 @@ impl Not for Bit {
     type Output = Self;
 
     fn not(self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match self {
-            Bit::Off => Bit::On,
-            Bit::On => Bit::Off,
+            Self::Off => Self::On,
+            Self::On => Self::Off,
         }
     }
 }
@@ -166,6 +174,7 @@ impl Not for &Bit {
     type Output = Self;
 
     fn not(self) -> Self::Output {
+        #[allow(clippy::match_same_arms)]
         match self {
             Bit::Off => &Bit::On,
             Bit::On => &Bit::Off,
@@ -175,9 +184,10 @@ impl Not for &Bit {
 
 impl From<bool> for Bit {
     fn from(value: bool) -> Self {
-        match value {
-            false => Self::Off,
-            true => Self::On,
+        if value {
+            Self::On
+        } else {
+            Self::Off
         }
     }
 }

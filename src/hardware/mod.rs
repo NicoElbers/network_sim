@@ -61,7 +61,7 @@ impl Node for Router {
         if self.connections.contains(&cable) {
             return;
         }
-        self.connections.push(cable.clone());
+        self.connections.push(cable);
     }
 
     fn get_connections(&self) -> &Vec<Arc<Cable>> {
@@ -98,7 +98,8 @@ impl Router {
         }
     }
 
-    pub fn is_edge_router(&self) -> bool {
+    #[must_use]
+    pub const fn is_edge_router(&self) -> bool {
         self.is_edge_router
     }
 }
@@ -138,7 +139,7 @@ impl Node for User {
         if self.connections.contains(&cable) {
             return;
         }
-        self.connections.push(cable.clone());
+        self.connections.push(cable);
     }
 
     fn get_connections(&self) -> &Vec<Arc<Cable>> {

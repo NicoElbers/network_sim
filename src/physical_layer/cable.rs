@@ -1,5 +1,4 @@
 use std::{
-    rc::Rc,
     sync::{mpsc::Sender, Arc},
     thread::sleep,
     time::Duration,
@@ -44,13 +43,17 @@ impl PartialEq for Cable {
 }
 
 impl Cable {
-    pub fn new(
-        node1: Rc<dyn Node>,
-        node2: Rc<dyn Node>,
+    pub fn new<A, B>(
+        node1: &Arc<A>,
+        node2: &Arc<B>,
         latency: Duration,
         corruption_type: Corruption,
         throughput_ms: u32,
-    ) -> Self {
+    ) -> Self
+    where
+        A: Node,
+        B: Node,
+    {
         let time_between_bytes = Duration::from_millis(1) / throughput_ms;
         let time_between_bits = time_between_bytes / 8;
 

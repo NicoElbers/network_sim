@@ -17,6 +17,7 @@ pub enum Corruption {
 }
 
 impl Corruption {
+    #[must_use]
     pub fn corrupt(mut self, data: BitString) -> BitString {
         self.corrupt_borrow(data)
     }
@@ -39,7 +40,7 @@ impl Corruption {
         }
     }
 
-    fn no_corruption(data: BitString) -> BitString {
+    const fn no_corruption(data: BitString) -> BitString {
         data
     }
 
@@ -149,7 +150,7 @@ impl Corruption {
 
 #[cfg(test)]
 mod test {
-    use crate::{bit::Bit, bit_string::BitString, utils::rand::XorShift};
+    use crate::{bit_string::BitString, utils::rand::XorShift};
 
     use super::Corruption;
 
@@ -253,23 +254,26 @@ mod test {
     }
 
     // --- Make sure the panics work as intended ---
-    fn get_data_empty() -> BitString {
+    const fn get_data_empty() -> BitString {
         BitString::new()
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn none_assert_panics() {
         Corruption::corrupt(Corruption::None, get_data_empty());
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn one_bit_flip_assert_panics() {
         Corruption::corrupt(Corruption::OneBitFlip(XorShift::new(0)), get_data_empty());
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn multi_bit_flip_even_assert_panics_on_no_data() {
         Corruption::corrupt(
@@ -279,6 +283,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn multi_bit_flip_even_assert_panics_on_impossible_chance() {
         Corruption::corrupt(
@@ -288,6 +293,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn multi_bit_flip_odd_assert_panics_on_no_data() {
         Corruption::corrupt(
@@ -297,6 +303,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn multi_bit_flip_odd_assert_panics_on_impossible_chance() {
         Corruption::corrupt(
@@ -306,21 +313,24 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn burst_flip_assert_panic() {
         Corruption::corrupt(Corruption::BurstFlip(XorShift::new(0)), get_data_empty());
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn assert_random_panics_on_no_data() {
         Corruption::corrupt(Corruption::Random(XorShift::new(0)), get_data_empty());
     }
 
     #[test]
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn assert_random_corrupt_panics_on_no_data() {
-        Corruption::corrupt(
+        let _ = Corruption::corrupt(
             Corruption::RandomCorruption(XorShift::new(0)),
             get_data_empty(),
         );
